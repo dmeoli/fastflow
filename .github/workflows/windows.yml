@@ -1,0 +1,45 @@
+name: windows
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  mingw:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { msystem: UCRT64 , cxx: g++ , cc: gcc }
+          - { msystem: CLANG64 , cxx: clang++ , cc: clang }
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          pacboy: ${{ matrix.cc }}:p
+      - name: some tests of the pipeline, the farm and the parallel_for
+        run: |
+          for t in simplest test1 test3_farm test_parfor test_parfor2 \
+                   test_dotprod_parfor; do
+            ${{ matrix.cxx }} -std=c++17 -O2 -I. -o $t tests/$t.cpp -pthread
+            ./$t > /dev/null && echo "$t ok"
+          done
+
+  msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: some tests of the pipeline, the farm and the parallel_for
+        shell: cmd
+        run: |
+          for %%t in (simplest test1 test3_farm test_parfor test_parfor2 test_dotprod_parfor) do (
+            cl /nologo /std:c++17 /EHsc /O2 /DNOMINMAX /Zc:__cplusplus /I. tests\%%t.cpp /Fe%%t.exe || exit /b 1
+            %%t.exe > NUL || exit /b 1
+            echo %%t ok
+          )
